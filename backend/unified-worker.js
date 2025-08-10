@@ -471,11 +471,16 @@ const HTML_TEMPLATE = `<!doctype html>
             
             if (data.results && data.results[0] && data.results[0].components) {
               console.log('Components found:', data.results[0].components.length);
-              setComponentData(data.results[0].components);
-              console.log('Component data set successfully');
+              if (data.results[0].components.length === 0) {
+                setError('No components found in this file. This could mean: (1) The file contains no published components or component sets, (2) The file is not a design system or component library, (3) Components exist but are not published to a team library. Try analyzing a file that contains published components or component sets.');
+                setComponentData([]);
+              } else {
+                setComponentData(data.results[0].components);
+                console.log('Component data set successfully');
+              }
             } else {
               console.log('No components found in response structure');
-              setError('No components found in the file');
+              setError('Unable to access components in this file. Please check: (1) Your Figma token has the correct permissions, (2) The file ID is correct and accessible, (3) You have viewing permissions for this file. The file may also contain no published components.');
             }
           } catch (error) {
             setError(error.message || 'Failed to analyze Figma file');
