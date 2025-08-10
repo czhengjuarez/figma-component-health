@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Enhanced component styles matching onboarding-builder */
+@layer components {
+  /* Primary button with enhanced styling */
+  .btn-primary-enhanced {
+    @apply bg-primary-500 text-white px-4 py-2 rounded-md hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all duration-200 font-medium shadow-sm hover:shadow-md text-sm flex items-center gap-2;
+  }
+
+  /* Secondary button */
+  .btn-secondary-enhanced {
+    @apply bg-white text-gray-700 px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 font-medium shadow-sm hover:shadow-md text-sm flex items-center gap-2;
+  }
+
+  /* Enhanced input styling */
+  .input-enhanced {
+    @apply px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white shadow-sm transition-all duration-200 text-sm;
+  }
+
+  /* Card component */
+  .card-enhanced {
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200;
+  }
+
+  /* Loading spinner */
+  .loading-spinner {
+    @apply w-8 h-8 border-4 border-gray-200 border-t-primary-500 rounded-full animate-spin;
+  }
+
+  /* Table styling */
+  .table-enhanced {
+    @apply w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm;
+  }
+
+  .table-enhanced th {
+    @apply bg-gray-50 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200;
+  }
+
+  .table-enhanced td {
+    @apply px-4 py-3 text-sm text-gray-700 border-b border-gray-200 text-left;
+  }
+
+  .table-enhanced tr:hover {
+    @apply bg-gray-50;
+  }
+}
