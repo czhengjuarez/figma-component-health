@@ -308,6 +308,37 @@ const HTML_TEMPLATE = `<!doctype html>
         const [showComponentInventory, setShowComponentInventory] = useState(false);
         const [showTopComponents, setShowTopComponents] = useState(true);
         
+        // Clear sensitive data on session end
+        React.useEffect(() => {
+          const clearTokenOnUnload = () => {
+            setFigmaToken('');
+            setFileKey('');
+            // Clear any stored data
+            if (typeof Storage !== 'undefined') {
+              sessionStorage.removeItem('figmaToken');
+              sessionStorage.removeItem('fileKey');
+            }
+          };
+          
+          // Clear on page unload/close
+          window.addEventListener('beforeunload', clearTokenOnUnload);
+          window.addEventListener('unload', clearTokenOnUnload);
+          
+          // Clear on visibility change (tab switch, minimize)
+          const handleVisibilityChange = () => {
+            if (document.hidden) {
+              clearTokenOnUnload();
+            }
+          };
+          document.addEventListener('visibilitychange', handleVisibilityChange);
+          
+          return () => {
+            window.removeEventListener('beforeunload', clearTokenOnUnload);
+            window.removeEventListener('unload', clearTokenOnUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+          };
+        }, []);
+        
         // Component grouping logic - handles hierarchical categorization
         const groupComponents = (components) => {
           const groups = {};
@@ -567,6 +598,9 @@ const HTML_TEMPLATE = `<!doctype html>
                   React.createElement('div', { className: 'text-sm text-gray-700' },
                     React.createElement('p', null,
                       React.createElement('strong', null, 'Note:'), ' You need viewing permissions (viewer, editor, or owner) for the Figma file to analyze it. The tool works with your own files, shared files, and public community files.'
+                    ),
+                    React.createElement('p', { className: 'mt-2 text-xs text-gray-600' },
+                      React.createElement('strong', null, 'Security:'), ' Your tokens are automatically cleared when you close the tab or switch away for your privacy and security.'
                     )
                   )
                 )
