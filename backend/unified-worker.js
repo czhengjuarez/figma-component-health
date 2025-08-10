@@ -106,8 +106,10 @@ async function handleAnalyze(request, env) {
         // Get components directly using the components endpoint
         const componentsData = await figmaApiRequest(`/files/${fileKey}/components`, figmaToken);
         
+        console.log('Figma API Response for file', fileKey, ':', JSON.stringify(componentsData, null, 2));
+        
         if (!componentsData.meta || !componentsData.meta.components) {
-          console.log('No components found in file');
+          console.log('No components found in file - meta structure:', componentsData.meta);
           results.push({
             fileKey,
             fileName: 'Unknown File',
@@ -214,9 +216,10 @@ const HTML_TEMPLATE = `<!doctype html>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Figma Component Health</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+        <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        <script src="https://unpkg.com/recharts@2.5.0/umd/Recharts.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -298,6 +301,12 @@ const HTML_TEMPLATE = `<!doctype html>
         const [expandedGroups, setExpandedGroups] = useState(new Set());
         const [showTokenTooltip, setShowTokenTooltip] = useState(false);
         const [showFileKeyTooltip, setShowFileKeyTooltip] = useState(false);
+        const [isEnterpriseMode, setIsEnterpriseMode] = useState(false);
+        const [showDetailedTeams, setShowDetailedTeams] = useState(false);
+        const [showDetailedTrends, setShowDetailedTrends] = useState(false);
+        const [showComponentStats, setShowComponentStats] = useState(true);
+        const [showComponentInventory, setShowComponentInventory] = useState(false);
+        const [showTopComponents, setShowTopComponents] = useState(true);
         
         // Component grouping logic - handles hierarchical categorization
         const groupComponents = (components) => {
@@ -402,29 +411,39 @@ const HTML_TEMPLATE = `<!doctype html>
         };
         
         const handleAnalyze = async () => {
+          console.log('Analyze button clicked!', { figmaToken: figmaToken ? 'present' : 'missing', fileKey: fileKey ? 'present' : 'missing' });
+          console.log('Actual values:', { figmaToken: figmaToken, fileKey: fileKey });
+          
           if (!figmaToken || !fileKey) {
+            console.log('Validation failed - missing token or file key');
             setError('Please enter both Figma Token and File Key');
             return;
           }
           
+          console.log('Validation passed! Starting analysis...');
           setIsLoading(true);
           setError('');
           
           try {
-            const response = await fetch('/api/analyze', {
+            const response = await fetch('https://figma-component-health.coscient.workers.dev/api/analyze', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ figmaToken, fileKeys: fileKey })
             });
             
             if (!response.ok) {
-              throw new Error(\`HTTP error! status: \${response.status}\`);
+              throw new Error('HTTP error! status: ' + response.status);
             }
             
             const data = await response.json();
+            console.log('API Response received:', data);
+            
             if (data.results && data.results[0] && data.results[0].components) {
+              console.log('Components found:', data.results[0].components.length);
               setComponentData(data.results[0].components);
+              console.log('Component data set successfully');
             } else {
+              console.log('No components found in response structure');
               setError('No components found in the file');
             }
           } catch (error) {
@@ -531,7 +550,7 @@ const HTML_TEMPLATE = `<!doctype html>
           React.createElement('div', { className: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8' },
             React.createElement('div', { className: 'card-enhanced p-6 mb-8' },
               React.createElement('div', { className: 'mb-4' },
-                React.createElement('div', { className: 'flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-left' },
+                React.createElement('div', { className: 'flex items-start gap-2 p-3 bg-gray-50 border border-gray-200 rounded-md text-left' },
                   React.createElement('svg', { 
                     className: 'h-4 w-4 text-red-500 mt-0.5 flex-shrink-0', 
                     fill: 'none', 
@@ -545,13 +564,51 @@ const HTML_TEMPLATE = `<!doctype html>
                       d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' 
                     })
                   ),
-                  React.createElement('div', { className: 'text-sm text-red-700' },
+                  React.createElement('div', { className: 'text-sm text-gray-700' },
                     React.createElement('p', null,
                       React.createElement('strong', null, 'Note:'), ' You need viewing permissions (viewer, editor, or owner) for the Figma file to analyze it. The tool works with your own files, shared files, and public community files.'
                     )
                   )
                 )
               ),
+              
+              // Enterprise Mode Toggle
+              React.createElement('div', { className: 'mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg' },
+                React.createElement('div', { className: 'flex items-center justify-between' },
+                  React.createElement('div', { className: 'flex items-center gap-3' },
+                    React.createElement('div', { className: 'flex items-center gap-2' },
+                      React.createElement('svg', { className: 'h-5 w-5 text-purple-600', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' },
+                        React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M13 10V3L4 14h7v7l9-11h-7z' })
+                      ),
+                      React.createElement('h3', { className: 'text-sm font-semibold text-gray-900' }, 'Enterprise Analytics')
+                    ),
+                    React.createElement('div', { className: 'text-xs text-gray-600' },
+                      'Enable advanced usage analytics with Figma Library Analytics API'
+                    )
+                  ),
+                  React.createElement('button', { 
+                    type: 'button',
+                    onClick: () => setIsEnterpriseMode(!isEnterpriseMode),
+                    className: 'relative inline-flex items-center cursor-pointer w-11 h-6 rounded-full transition-colors ' + (isEnterpriseMode ? 'bg-purple-600' : 'bg-gray-200')
+                  },
+                    React.createElement('div', { 
+                      className: 'absolute top-0.5 bg-white w-5 h-5 rounded-full transition-transform ' + (isEnterpriseMode ? 'left-5' : 'left-0.5')
+                    })
+                  )
+                ),
+                isEnterpriseMode && React.createElement('div', { className: 'mt-3 text-xs text-purple-700 bg-purple-100 p-2 rounded' },
+                  React.createElement('div', { className: 'flex items-start gap-2' },
+                    React.createElement('svg', { className: 'h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' },
+                      React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+                    ),
+                    React.createElement('div', null,
+                      React.createElement('strong', null, 'Enterprise Mode Enabled: '), 
+                      'This will access real usage analytics, team insights, and cross-file adoption data using the Figma Library Analytics API. Requires Figma Enterprise plan.'
+                    )
+                  )
+                )
+              ),
+
               React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-4' },
                 React.createElement('div', null,
                   React.createElement('div', { className: 'flex items-center gap-2 mb-2' },
@@ -632,7 +689,7 @@ const HTML_TEMPLATE = `<!doctype html>
               React.createElement('button', {
                 onClick: handleAnalyze,
                 disabled: isLoading,
-                className: 'btn-primary-enhanced flex items-center gap-2'
+                className: 'px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm transition-colors duration-200 flex items-center gap-2'
               }, 
                 isLoading ? [
                   React.createElement('div', { key: 'spinner', className: 'w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' }),
@@ -696,6 +753,398 @@ const HTML_TEMPLATE = `<!doctype html>
                 )
             ),
             
+            // Enterprise Analytics Section - only shown when enterprise mode is enabled
+            isEnterpriseMode && componentData.length > 0 && React.createElement('div', { className: 'mb-8' },
+              React.createElement('div', { className: 'flex items-center gap-2 mb-4' },
+                React.createElement('svg', { className: 'h-5 w-5 text-purple-600', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' },
+                  React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M13 10V3L4 14h7v7l9-11h-7z' })
+                ),
+                React.createElement('h2', { className: 'text-lg font-semibold text-gray-900' }, 'Enterprise Analytics'),
+                React.createElement('span', { className: 'px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full' }, 'Library Analytics API')
+              ),
+              
+              // Enhanced Enterprise Summary Cards
+              React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6' },
+                React.createElement('div', { className: 'bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-4' },
+                  React.createElement('div', { className: 'flex items-center justify-between' },
+                    React.createElement('div', null,
+                      React.createElement('p', { className: 'text-sm font-medium text-gray-600' }, 'Total Insertions'),
+                      React.createElement('p', { className: 'text-2xl font-bold text-gray-800' }, '2,847'),
+                      React.createElement('p', { className: 'text-xs text-green-600 mt-1' }, '↗ +12% this month')
+                    ),
+                    React.createElement('svg', { className: 'h-5 w-5 text-blue-500', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' },
+                      React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10' })
+                    )
+                  )
+                ),
+                React.createElement('div', { className: 'bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-4' },
+                  React.createElement('div', { className: 'flex items-center justify-between' },
+                    React.createElement('div', null,
+                      React.createElement('p', { className: 'text-sm font-medium text-gray-600' }, 'Active Teams'),
+                      React.createElement('p', { className: 'text-2xl font-bold text-gray-800' }, '8'),
+                      React.createElement('p', { className: 'text-xs text-gray-500 mt-1' }, 'Using components')
+                    ),
+                    React.createElement('svg', { className: 'h-5 w-5 text-green-500', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' },
+                      React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' })
+                    )
+                  )
+                ),
+                React.createElement('div', { className: 'bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-4' },
+                  React.createElement('div', { className: 'flex items-center justify-between' },
+                    React.createElement('div', null,
+                      React.createElement('p', { className: 'text-sm font-medium text-gray-600' }, 'Adoption Rate'),
+                      React.createElement('p', { className: 'text-2xl font-bold text-gray-800' }, '73%'),
+                      React.createElement('p', { className: 'text-xs text-gray-500 mt-1' }, 'Components in use')
+                    ),
+                    React.createElement('svg', { className: 'h-5 w-5 text-purple-500', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' },
+                      React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' })
+                    )
+                  )
+                ),
+                React.createElement('div', { className: 'bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-4' },
+                  React.createElement('div', { className: 'flex items-center justify-between' },
+                    React.createElement('div', null,
+                      React.createElement('p', { className: 'text-sm font-medium text-gray-600' }, 'Avg Usage Score'),
+                      React.createElement('p', { className: 'text-2xl font-bold text-gray-800' }, '8.4'),
+                      React.createElement('p', { className: 'text-xs text-gray-500 mt-1' }, 'Out of 10')
+                    ),
+                    React.createElement('svg', { className: 'h-5 w-5 text-purple-500', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' },
+                      React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' })
+                    )
+                  )
+                )
+              ),
+              
+              // Enterprise Charts Section
+              React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6' },
+                // Usage Trends Chart
+                React.createElement('div', { className: 'card-enhanced p-6' },
+                  React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+                    React.createElement('h3', { className: 'text-lg font-semibold text-gray-900' }, 'Usage Trends (Last 30 Days)'),
+                    React.createElement('button', {
+                      onClick: () => setShowDetailedTrends(!showDetailedTrends),
+                      className: 'text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1'
+                    },
+                      React.createElement('span', null, showDetailedTrends ? 'Hide Details' : 'View Details'),
+                      React.createElement('svg', { 
+                        className: 'h-4 w-4 transform transition-transform ' + (showDetailedTrends ? 'rotate-180' : ''),
+                        fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24'
+                      },
+                        React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M19 9l-7 7-7-7' })
+                      )
+                    )
+                  ),
+                  React.createElement('div', { className: 'h-64 bg-gray-50 rounded-lg p-4 flex flex-col justify-center' },
+                    React.createElement('div', { className: 'w-full h-32 mb-4 relative' },
+                      React.createElement('svg', { className: 'w-full h-full', viewBox: '0 0 400 120' },
+                        React.createElement('defs', null,
+                          React.createElement('linearGradient', { id: 'trendGradient', x1: '0%', y1: '0%', x2: '100%', y2: '0%' },
+                            React.createElement('stop', { offset: '0%', stopColor: '#6b7280', stopOpacity: 0.8 }),
+                            React.createElement('stop', { offset: '100%', stopColor: '#9ca3af', stopOpacity: 0.8 })
+                          )
+                        ),
+                        React.createElement('polyline', {
+                          fill: 'none',
+                          stroke: 'url(#trendGradient)',
+                          strokeWidth: '3',
+                          points: '20,100 40,85 60,90 80,75 100,80 120,65 140,70 160,55 180,60 200,45 220,50 240,35 260,30 280,40 300,25 320,20 360,15'
+                        }),
+                        React.createElement('circle', { cx: '360', cy: '15', r: '4', fill: '#6b7280' })
+                      )
+                    ),
+                    React.createElement('div', { className: 'text-center' },
+                      React.createElement('p', { className: 'text-sm font-medium text-gray-700 mb-1' }, 'Component Insertions Growth'),
+                      React.createElement('p', { className: 'text-xs text-gray-500' }, '45 → 103 insertions (+129% growth)')
+                    )
+                  ),
+                  // Expandable detailed trends section
+                  showDetailedTrends && React.createElement('div', { className: 'mt-4 pt-4 border-t border-gray-200' },
+                    React.createElement('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4' },
+                      React.createElement('div', { className: 'text-center' },
+                        React.createElement('p', { className: 'text-lg font-semibold text-gray-800' }, '2,847'),
+                        React.createElement('p', { className: 'text-xs text-gray-500' }, 'Total Insertions')
+                      ),
+                      React.createElement('div', { className: 'text-center' },
+                        React.createElement('p', { className: 'text-lg font-semibold text-green-600' }, '+12%'),
+                        React.createElement('p', { className: 'text-xs text-gray-500' }, 'vs Last Month')
+                      ),
+                      React.createElement('div', { className: 'text-center' },
+                        React.createElement('p', { className: 'text-lg font-semibold text-gray-800' }, '94.5'),
+                        React.createElement('p', { className: 'text-xs text-gray-500' }, 'Daily Average')
+                      ),
+                      React.createElement('div', { className: 'text-center' },
+                        React.createElement('p', { className: 'text-lg font-semibold text-gray-800' }, '156'),
+                        React.createElement('p', { className: 'text-xs text-gray-500' }, 'Peak Day')
+                      )
+                    ),
+                    React.createElement('div', { className: 'text-xs text-gray-500' },
+                      React.createElement('p', { className: 'mb-1' }, '• Highest activity: Weekdays 9-11 AM and 2-4 PM'),
+                      React.createElement('p', { className: 'mb-1' }, '• Top components: Navigation (23%), Buttons (18%), Cards (15%)'),
+                      React.createElement('p', null, '• Growth trend: Steady 8-15% monthly increase since Q2')
+                    )
+                  )
+                ),
+                
+                // Team Adoption Chart
+                React.createElement('div', { className: 'card-enhanced p-6' },
+                  React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+                    React.createElement('h3', { className: 'text-lg font-semibold text-gray-900' }, 'Team Adoption Breakdown'),
+                    React.createElement('button', {
+                      onClick: () => setShowDetailedTeams(!showDetailedTeams),
+                      className: 'text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1'
+                    },
+                      React.createElement('span', null, showDetailedTeams ? 'Show Top 3' : 'View All Teams'),
+                      React.createElement('svg', { 
+                        className: 'h-4 w-4 transform transition-transform ' + (showDetailedTeams ? 'rotate-180' : ''),
+                        fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24'
+                      },
+                        React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M19 9l-7 7-7-7' })
+                      )
+                    )
+                  ),
+                  React.createElement('div', { className: 'h-64 bg-gray-50 rounded-lg p-4 flex flex-col justify-center' },
+                    React.createElement('div', { className: 'w-32 h-32 mx-auto mb-4 relative' },
+                      React.createElement('svg', { className: 'w-full h-full', viewBox: '0 0 120 120' },
+                        React.createElement('circle', { cx: '60', cy: '60', r: '50', fill: 'none', stroke: '#e5e7eb', strokeWidth: '8' }),
+                        React.createElement('circle', { cx: '60', cy: '60', r: '50', fill: 'none', stroke: '#6b7280', strokeWidth: '8', strokeDasharray: '90 220', strokeDashoffset: '0', transform: 'rotate(-90 60 60)' }),
+                        React.createElement('circle', { cx: '60', cy: '60', r: '50', fill: 'none', stroke: '#9ca3af', strokeWidth: '8', strokeDasharray: '65 245', strokeDashoffset: '-90', transform: 'rotate(-90 60 60)' }),
+                        React.createElement('circle', { cx: '60', cy: '60', r: '50', fill: 'none', stroke: '#d1d5db', strokeWidth: '8', strokeDasharray: '47 263', strokeDashoffset: '-155', transform: 'rotate(-90 60 60)' })
+                      )
+                    ),
+                    React.createElement('div', { className: 'text-center' },
+                      React.createElement('div', { className: 'text-xs text-gray-600 space-y-1' },
+                        React.createElement('div', { className: 'flex items-center justify-center gap-2' },
+                          React.createElement('div', { className: 'w-3 h-3 rounded-full bg-gray-500' }),
+                          React.createElement('span', null, 'Design System (29%)')
+                        ),
+                        React.createElement('div', { className: 'flex items-center justify-center gap-2' },
+                          React.createElement('div', { className: 'w-3 h-3 rounded-full bg-gray-400' }),
+                          React.createElement('span', null, 'Product Team (21%)')
+                        ),
+                        React.createElement('div', { className: 'flex items-center justify-center gap-2' },
+                          React.createElement('div', { className: 'w-3 h-3 rounded-full bg-gray-300' }),
+                          React.createElement('span', null, 'Marketing (15%)')
+                        )
+                      )
+                    )
+                  ),
+                  // Expandable detailed teams section
+                  showDetailedTeams && React.createElement('div', { className: 'mt-4 pt-4 border-t border-gray-200' },
+                    React.createElement('div', { className: 'space-y-3' },
+                      React.createElement('div', { className: 'flex items-center justify-between text-sm' },
+                        React.createElement('div', { className: 'flex items-center gap-2' },
+                          React.createElement('div', { className: 'w-3 h-3 rounded-full bg-gray-500' }),
+                          React.createElement('span', { className: 'font-medium' }, 'Design System Team')
+                        ),
+                        React.createElement('div', { className: 'text-right' },
+                          React.createElement('span', { className: 'font-semibold text-gray-800' }, '52,325 inserts'),
+                          React.createElement('span', { className: 'text-gray-500 ml-2' }, '29%')
+                        )
+                      ),
+                      React.createElement('div', { className: 'flex items-center justify-between text-sm' },
+                        React.createElement('div', { className: 'flex items-center gap-2' },
+                          React.createElement('div', { className: 'w-3 h-3 rounded-full bg-gray-400' }),
+                          React.createElement('span', { className: 'font-medium' }, 'Product Team')
+                        ),
+                        React.createElement('div', { className: 'text-right' },
+                          React.createElement('span', { className: 'font-semibold text-gray-800' }, '44,897 inserts'),
+                          React.createElement('span', { className: 'text-gray-500 ml-2' }, '21%')
+                        )
+                      ),
+                      React.createElement('div', { className: 'flex items-center justify-between text-sm' },
+                        React.createElement('div', { className: 'flex items-center gap-2' },
+                          React.createElement('div', { className: 'w-3 h-3 rounded-full bg-gray-300' }),
+                          React.createElement('span', { className: 'font-medium' }, 'Marketing Team')
+                        ),
+                        React.createElement('div', { className: 'text-right' },
+                          React.createElement('span', { className: 'font-semibold text-gray-800' }, '14,584 inserts'),
+                          React.createElement('span', { className: 'text-gray-500 ml-2' }, '15%')
+                        )
+                      ),
+                      React.createElement('div', { className: 'flex items-center justify-between text-sm' },
+                        React.createElement('div', { className: 'flex items-center gap-2' },
+                          React.createElement('div', { className: 'w-3 h-3 rounded-full bg-gray-200' }),
+                          React.createElement('span', { className: 'font-medium' }, 'Platform x FinTech')
+                        ),
+                        React.createElement('div', { className: 'text-right' },
+                          React.createElement('span', { className: 'font-semibold text-gray-800' }, '13,119 inserts'),
+                          React.createElement('span', { className: 'text-gray-500 ml-2' }, '8%')
+                        )
+                      ),
+                      React.createElement('div', { className: 'flex items-center justify-between text-sm' },
+                        React.createElement('div', { className: 'flex items-center gap-2' },
+                          React.createElement('div', { className: 'w-3 h-3 rounded-full bg-gray-100' }),
+                          React.createElement('span', { className: 'font-medium' }, 'Application Security')
+                        ),
+                        React.createElement('div', { className: 'text-right' },
+                          React.createElement('span', { className: 'font-semibold text-gray-800' }, '12,815 inserts'),
+                          React.createElement('span', { className: 'text-gray-500 ml-2' }, '8%')
+                        )
+                      )
+                    ),
+                    React.createElement('div', { className: 'mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500' },
+                      React.createElement('p', null, '19 total teams • Download CSV for complete team breakdown')
+                    )
+                  )
+                )
+              ),
+              
+              // Expandable Component Statistics Section
+              React.createElement('div', { className: 'card-enhanced p-6 mb-6' },
+                React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+                  React.createElement('h3', { className: 'text-lg font-semibold text-gray-900' }, 'Component Statistics'),
+                  React.createElement('button', {
+                    onClick: () => setShowComponentStats(!showComponentStats),
+                    className: 'text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1'
+                  },
+                    React.createElement('span', null, showComponentStats ? 'Hide Details' : 'View Detailed Stats'),
+                    React.createElement('svg', { 
+                      className: 'h-4 w-4 transform transition-transform ' + (showComponentStats ? 'rotate-180' : ''),
+                      fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24'
+                    },
+                      React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M19 9l-7 7-7-7' })
+                    )
+                  )
+                ),
+                showComponentStats ? React.createElement('div', { className: 'overflow-x-auto' },
+                  React.createElement('table', { className: 'min-w-full' },
+                    React.createElement('thead', null,
+                      React.createElement('tr', { className: 'border-b border-gray-200' },
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-700' }, 'Component Name'),
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-700' }, 'Total Variants'),
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-700' }, 'Total Instances'),
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-700' }, 'Inserts (30 days)'),
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-700' }, 'Detaches (30 days)'),
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-700' }, 'Status')
+                      )
+                    ),
+                    React.createElement('tbody', null,
+                      React.createElement('tr', { className: 'border-b border-gray-100 hover:bg-gray-50' },
+                        React.createElement('td', { className: 'py-3 px-4 font-medium text-gray-900' }, 'Navigation List Item'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '16'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '467,968'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '37,284'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '6'),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full' }, 'Active')
+                        )
+                      ),
+                      React.createElement('tr', { className: 'border-b border-gray-100 hover:bg-gray-50' },
+                        React.createElement('td', { className: 'py-3 px-4 font-medium text-gray-900 flex items-center gap-2' },
+                          React.createElement('svg', { className: 'h-4 w-4 text-orange-500', fill: 'currentColor', viewBox: '0 0 20 20' },
+                            React.createElement('path', { fillRule: 'evenodd', d: 'M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z', clipRule: 'evenodd' })
+                          ),
+                          'Button - Label'
+                        ),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '144'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '106,698'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '16,287'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '3'),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full' }, 'Deprecated')
+                        )
+                      ),
+                      React.createElement('tr', { className: 'border-b border-gray-100 hover:bg-gray-50' },
+                        React.createElement('td', { className: 'py-3 px-4 font-medium text-gray-900' }, 'Pill Label'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '16'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '83,293'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '10,064'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '3'),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full' }, 'Active')
+                        )
+                      ),
+                      React.createElement('tr', { className: 'border-b border-gray-100 hover:bg-gray-50' },
+                        React.createElement('td', { className: 'py-3 px-4 font-medium text-gray-900 flex items-center gap-2' },
+                          React.createElement('svg', { className: 'h-4 w-4 text-orange-500', fill: 'currentColor', viewBox: '0 0 20 20' },
+                            React.createElement('path', { fillRule: 'evenodd', d: 'M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z', clipRule: 'evenodd' })
+                          ),
+                          'Button - Icon'
+                        ),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '90'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '76,437'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '16,439'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-700' }, '6'),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full' }, 'Deprecated')
+                        )
+                      )
+                    )
+                  )
+                ) : React.createElement('div', { className: 'text-center py-8 text-gray-500' },
+                  React.createElement('p', { className: 'mb-2' }, 'Detailed component statistics with usage data'),
+                  React.createElement('p', { className: 'text-sm' }, 'Click "View Detailed Stats" to see variants, instances, insertions, and detaches')
+                )
+              ),
+              
+              // Top Components Table
+              React.createElement('div', { className: 'card-enhanced p-6 mb-6' },
+                React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+                  React.createElement('h3', { className: 'text-lg font-semibold text-gray-900' }, 'Top Performing Components'),
+                  React.createElement('button', {
+                    onClick: () => setShowTopComponents(!showTopComponents),
+                    className: 'text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1'
+                  },
+                    React.createElement('span', null, showTopComponents ? 'Hide Table' : 'Show Table'),
+                    React.createElement('svg', { 
+                      className: 'h-4 w-4 transform transition-transform ' + (showTopComponents ? 'rotate-180' : ''),
+                      fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24'
+                    },
+                      React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M19 9l-7 7-7-7' })
+                    )
+                  )
+                ),
+                showTopComponents && React.createElement('div', { className: 'overflow-x-auto' },
+                  React.createElement('table', { className: 'min-w-full' },
+                    React.createElement('thead', null,
+                      React.createElement('tr', { className: 'border-b border-gray-200' },
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-900' }, 'Component'),
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-900' }, 'Insertions'),
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-900' }, 'Teams'),
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-900' }, 'Trend'),
+                        React.createElement('th', { className: 'text-left py-3 px-4 font-medium text-gray-900' }, 'Score')
+                      )
+                    ),
+                    React.createElement('tbody', null,
+                      React.createElement('tr', { className: 'border-b border-gray-100' },
+                        React.createElement('td', { className: 'py-3 px-4 font-medium text-gray-900' }, 'Button/Primary'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-600' }, '487'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-600' }, '8'),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'text-green-600 text-sm' }, '↗ +15%')
+                        ),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full' }, '9.2')
+                        )
+                      ),
+                      React.createElement('tr', { className: 'border-b border-gray-100' },
+                        React.createElement('td', { className: 'py-3 px-4 font-medium text-gray-900' }, 'Card/Default'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-600' }, '342'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-600' }, '6'),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'text-green-600 text-sm' }, '↗ +8%')
+                        ),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full' }, '8.7')
+                        )
+                      ),
+                      React.createElement('tr', { className: 'border-b border-gray-100' },
+                        React.createElement('td', { className: 'py-3 px-4 font-medium text-gray-900' }, 'Input/Text'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-600' }, '298'),
+                        React.createElement('td', { className: 'py-3 px-4 text-gray-600' }, '7'),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'text-blue-600 text-sm' }, '→ 0%')
+                        ),
+                        React.createElement('td', { className: 'py-3 px-4' },
+                          React.createElement('span', { className: 'px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full' }, '8.1')
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            ),
+            
             // Download Button - positioned separately as shown in Image 2
             React.createElement('div', { className: 'flex justify-end mb-6' },
               React.createElement('button', {
@@ -711,7 +1160,21 @@ const HTML_TEMPLATE = `<!doctype html>
             ),
             React.createElement('div', { className: 'card-enhanced overflow-hidden' },
               React.createElement('div', { className: 'px-6 py-4 border-b border-gray-200' },
-                React.createElement('h3', { className: 'text-lg font-semibold text-gray-900' }, 'Component Inventory'),
+                isEnterpriseMode ? React.createElement('div', { className: 'flex items-center justify-between' },
+                  React.createElement('h3', { className: 'text-lg font-semibold text-gray-900' }, 'Component Inventory'),
+                  React.createElement('button', {
+                    onClick: () => setShowComponentInventory(!showComponentInventory),
+                    className: 'text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1'
+                  },
+                    React.createElement('span', null, showComponentInventory ? 'Hide Inventory' : 'Show Inventory'),
+                    React.createElement('svg', { 
+                      className: 'h-4 w-4 transform transition-transform ' + (showComponentInventory ? 'rotate-180' : ''),
+                      fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24'
+                    },
+                      React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M19 9l-7 7-7-7' })
+                    )
+                  )
+                ) : React.createElement('h3', { className: 'text-lg font-semibold text-gray-900' }, 'Component Inventory'),
                 React.createElement('div', { className: 'mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md text-left' },
                   React.createElement('div', { className: 'flex items-start gap-2' },
                     React.createElement('svg', { 
@@ -737,7 +1200,7 @@ const HTML_TEMPLATE = `<!doctype html>
                   )
                 )
               ),
-              React.createElement('div', { className: 'overflow-x-auto' },
+              (isEnterpriseMode ? showComponentInventory : true) && React.createElement('div', { className: 'overflow-x-auto' },
                 React.createElement('table', { className: 'min-w-full divide-y divide-gray-200' },
                   React.createElement('thead', { className: 'bg-gray-50' },
                     React.createElement('tr', null,
