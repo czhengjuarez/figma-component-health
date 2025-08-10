@@ -25,27 +25,261 @@ async function figmaApiRequest(endpoint, token) {
   }
 }
 
-// Helper function to calculate component health score
-function calculateHealthScore(component, instanceCount, isDeprecated, isLibraryFile = true) {
-  let score = 100;
+// Helper function to check accessibility compliance
+function checkAccessibilityCompliance(component) {
+  let hasIssues = false;
   
-  // Penalize deprecated components
-  if (isDeprecated) score -= 50;
+  // Check for potential color contrast issues (very basic inference)
+  // Components with very light colors or poor naming might have contrast issues
+  const name = component.name.toLowerCase();
+  const description = (component.description || '').toLowerCase();
   
-  // For library files, don't penalize for low usage within the same file
-  // since components are meant to be used across other files/teams
-  if (!isLibraryFile && instanceCount === 0) {
-    score -= 30; // Only penalize unused components in non-library files
+  // Check for missing focus states (critical for keyboard navigation)
+  const hasFocusState = name.includes('focus') || name.includes('focused') || 
+                       description.includes('focus') || description.includes('keyboard');
+  
+  // Interactive components should have focus states
+  const isInteractive = name.includes('button') || name.includes('input') || 
+                        name.includes('link') || name.includes('checkbox') || 
+                        name.includes('radio') || name.includes('select') ||
+                        name.includes('toggle') || name.includes('switch');
+  
+  if (isInteractive && !hasFocusState) {
+    hasIssues = true; // Interactive component missing focus state
   }
   
-  // Penalize components without descriptions (documentation is important for libraries)
-  if (!component.description || component.description.trim() === '') score -= 15;
+  // Check for missing disabled states (important for accessibility)
+  const hasDisabledState = name.includes('disabled') || name.includes('inactive') ||
+                          description.includes('disabled') || description.includes('inactive');
   
-  // For library files, give bonus for having good documentation instead of usage
-  if (isLibraryFile && component.description && component.description.length > 20) {
-    score += 10; // Bonus for well-documented library components
-  } else if (!isLibraryFile && instanceCount > 5) {
-    score += 10; // Bonus for well-used components in regular files
+  if (isInteractive && !hasDisabledState) {
+    hasIssues = true; // Interactive component missing disabled state
+  }
+  
+  // Check for components that might have text but no size variants (readability)
+  const hasText = name.includes('text') || name.includes('label') || 
+                  name.includes('title') || name.includes('heading') ||
+                  name.includes('caption') || name.includes('body');
+  
+  const hasSizeVariants = name.includes('small') || name.includes('medium') || 
+                         name.includes('large') || name.includes('xl') ||
+                         name.includes('size=') || name.includes('size /');
+  
+  if (hasText && !hasSizeVariants) {
+    hasIssues = true; // Text component without size options for readability
+  }
+  
+  // WCAG 2.2 Color Contrast Issues (inferred from naming patterns)
+  const contrastIssues = checkColorContrastCompliance(component);
+  if (contrastIssues) {
+    hasIssues = true; // Color contrast violations
+  }
+  
+  return hasIssues;
+}
+
+// Helper function to check WCAG 2.2 color contrast compliance
+function checkColorContrastCompliance(component) {
+  const name = component.name.toLowerCase();
+  const description = (component.description || '').toLowerCase();
+  
+  let hasContrastIssues = false;
+  
+  // Check for problematic color combinations in naming
+  const lightColors = ['light', 'pale', 'faded', 'subtle', 'ghost', 'muted'];
+  const darkColors = ['dark', 'black', 'deep', 'bold', 'strong'];
+  
+  // Problematic: Light text on light backgrounds or dark on dark
+  const hasLightColor = lightColors.some(color => name.includes(color));
+  const hasDarkColor = darkColors.some(color => name.includes(color));
+  
+  // Check for components that might have contrast issues
+  const isTextComponent = name.includes('text') || name.includes('label') || 
+                         name.includes('caption') || name.includes('heading') ||
+                         name.includes('title') || name.includes('body');
+  
+  const isButtonComponent = name.includes('button') || name.includes('btn');
+  const isInputComponent = name.includes('input') || name.includes('field') || 
+                          name.includes('textbox');
+  
+  // Red flags for contrast issues
+  if (isTextComponent || isButtonComponent || isInputComponent) {
+    // Check for warning signs in naming
+    const warningPatterns = [
+      'white text', 'light text', 'gray text', 'grey text',
+      'white button', 'light button', 'ghost button',
+      'transparent', 'overlay', 'watermark'
+    ];
+    
+    const hasWarningPattern = warningPatterns.some(pattern => 
+      name.includes(pattern) || description.includes(pattern)
+    );
+    
+    if (hasWarningPattern) {
+      hasContrastIssues = true;
+    }
+    
+    // Check for missing contrast documentation
+    const hasContrastDocs = description.includes('contrast') || 
+                           description.includes('wcag') || 
+                           description.includes('aa') || 
+                           description.includes('aaa') ||
+                           description.includes('4.5:1') ||
+                           description.includes('3:1') ||
+                           description.includes('7:1');
+    
+    // Interactive components should have contrast documentation
+    if ((isButtonComponent || isInputComponent) && !hasContrastDocs) {
+      hasContrastIssues = true;
+    }
+  }
+  
+  // Check for disabled states that might have contrast issues
+  const isDisabledVariant = name.includes('disabled') || name.includes('inactive');
+  if (isDisabledVariant && !description.includes('contrast')) {
+    hasContrastIssues = true; // Disabled states often have contrast issues
+  }
+  
+  return hasContrastIssues;
+}
+
+// Helper function to check for accessibility excellence (bonus points)
+function checkAccessibilityExcellence(component) {
+  const name = component.name.toLowerCase();
+  const description = (component.description || '').toLowerCase();
+  
+  let excellencePoints = 0;
+  
+  // Check for comprehensive state coverage
+  const hasAllStates = ['default', 'hover', 'focus', 'disabled'].every(state => 
+    name.includes(state) || description.includes(state)
+  );
+  if (hasAllStates) excellencePoints++;
+  
+  // Check for accessibility-specific documentation
+  const hasA11yDocs = description.includes('accessibility') || 
+                     description.includes('a11y') || 
+                     description.includes('screen reader') ||
+                     description.includes('keyboard') ||
+                     description.includes('aria') ||
+                     description.includes('contrast');
+  if (hasA11yDocs) excellencePoints++;
+  
+  // Check for WCAG 2.2 color contrast compliance documentation
+  const hasContrastCompliance = description.includes('wcag') || 
+                               description.includes('4.5:1') || 
+                               description.includes('3:1') || 
+                               description.includes('7:1') ||
+                               description.includes('aa compliance') ||
+                               description.includes('aaa compliance') ||
+                               description.includes('contrast ratio');
+  if (hasContrastCompliance) excellencePoints++;
+  
+  // Check for semantic naming that suggests proper ARIA implementation
+  const hasSemanticNaming = name.includes('button') || name.includes('input') || 
+                           name.includes('label') || name.includes('heading') ||
+                           name.includes('navigation') || name.includes('banner') ||
+                           name.includes('main') || name.includes('aside');
+  if (hasSemanticNaming) excellencePoints++;
+  
+  // Check for size/scale variants (important for readability)
+  const hasSizeOptions = name.includes('small') || name.includes('medium') || 
+                        name.includes('large') || name.includes('size=') ||
+                        description.includes('size') || description.includes('scale');
+  if (hasSizeOptions) excellencePoints++;
+  
+  // Excellent accessibility requires multiple indicators
+  return excellencePoints >= 3;
+}
+
+// Helper function to calculate component health score
+function calculateHealthScore(component, instanceCount, isDeprecated, isLibraryFile = true) {
+  let score = 100; // Base Score: 100 points
+  
+  // CRITICAL ISSUES (-50 points each)
+  if (isDeprecated) {
+    score -= 50; // Deprecated status
+  }
+  
+  // Check for broken auto-layout/constraints (inferred from component structure)
+  if (component.absoluteBoundingBox && (
+    component.absoluteBoundingBox.width <= 0 || 
+    component.absoluteBoundingBox.height <= 0
+  )) {
+    score -= 50; // Broken layout dimensions
+  }
+  
+  // Accessibility violations (inferred from component characteristics)
+  const hasAccessibilityIssues = checkAccessibilityCompliance(component);
+  if (hasAccessibilityIssues) {
+    score -= 50; // Critical accessibility violations
+  }
+  
+  // MAJOR ISSUES (-25 points each)
+  
+  // Poor documentation
+  if (!component.description || component.description.trim().length < 10) {
+    score -= 25; // Missing or very poor documentation
+  }
+  
+  // Check for missing key variants (inferred from naming patterns)
+  const hasVariants = component.name.includes('=') || component.name.includes('/');
+  const commonVariants = ['hover', 'disabled', 'active', 'focus', 'default'];
+  const hasCommonVariants = commonVariants.some(variant => 
+    component.name.toLowerCase().includes(variant)
+  );
+  
+  if (!hasVariants && !hasCommonVariants) {
+    score -= 25; // Likely missing key interaction variants
+  }
+  
+  // MINOR ISSUES (-10 points each)
+  
+  // Naming convention violations
+  const hasGoodNaming = /^[A-Z][a-zA-Z0-9]*(\s*[\/=]\s*[A-Z][a-zA-Z0-9]*)*$/.test(component.name);
+  if (!hasGoodNaming) {
+    score -= 10; // Poor naming conventions
+  }
+  
+  // Missing thumbnails (no thumbnail_url or broken)
+  if (!component.thumbnail_url || component.thumbnail_url.includes('placeholder')) {
+    score -= 10; // Missing or broken thumbnail
+  }
+  
+  // Inconsistent property patterns (check for mixed naming styles)
+  if (component.name.includes('=') && component.name.includes('/')) {
+    score -= 10; // Mixed property patterns (both = and / in same component)
+  }
+  
+  // BONUS POINTS (+10 points each)
+  
+  // Excellent documentation with examples
+  if (component.description && component.description.length > 50 && 
+      (component.description.includes('example') || component.description.includes('usage'))) {
+    score += 10; // Rich documentation with examples
+  }
+  
+  // Design token integration (inferred from consistent naming)
+  if (component.name.match(/^(Button|Input|Card|Icon|Badge|Alert)/) && hasVariants) {
+    score += 10; // Follows design system patterns
+  }
+  
+  // High adoption indicator (for library files, good documentation suggests usage)
+  if (isLibraryFile && component.description && component.description.length > 30) {
+    score += 10; // Well-documented library components likely have good adoption
+  }
+  
+  // Component completeness bonus (has both description and proper structure)
+  if (component.description && component.description.length > 20 && 
+      component.absoluteBoundingBox && 
+      component.absoluteBoundingBox.width > 0 && 
+      component.absoluteBoundingBox.height > 0) {
+    score += 10; // Complete, well-structured component
+  }
+  
+  // Full accessibility compliance bonus
+  if (!hasAccessibilityIssues && checkAccessibilityExcellence(component)) {
+    score += 10; // Excellent accessibility implementation
   }
   
   return Math.max(0, Math.min(100, score));
@@ -307,6 +541,154 @@ const HTML_TEMPLATE = `<!doctype html>
         const [showComponentStats, setShowComponentStats] = useState(true);
         const [showComponentInventory, setShowComponentInventory] = useState(false);
         const [showTopComponents, setShowTopComponents] = useState(true);
+        const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0, stage: '' });
+        
+        // Thumbnail-based color contrast analysis functions
+        const calculateLuminance = (r, g, b) => {
+          const [rs, gs, bs] = [r, g, b].map(c => {
+            c = c / 255;
+            return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+          });
+          return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+        };
+        
+        const calculateContrastRatio = (color1, color2) => {
+          const lum1 = calculateLuminance(color1.r, color1.g, color1.b);
+          const lum2 = calculateLuminance(color2.r, color2.g, color2.b);
+          const brightest = Math.max(lum1, lum2);
+          const darkest = Math.min(lum1, lum2);
+          return (brightest + 0.05) / (darkest + 0.05);
+        };
+        
+        const analyzeImageColors = async (imageUrl) => {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = () => {
+              try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const pixels = imageData.data;
+                
+                // Extract dominant colors
+                const colorCounts = {};
+                for (let i = 0; i < pixels.length; i += 4) {
+                  const r = pixels[i];
+                  const g = pixels[i + 1];
+                  const b = pixels[i + 2];
+                  const alpha = pixels[i + 3];
+                  
+                  if (alpha > 128) { // Only count non-transparent pixels
+                    const colorKey = \`\${Math.floor(r/32)*32},\${Math.floor(g/32)*32},\${Math.floor(b/32)*32}\`;
+                    colorCounts[colorKey] = (colorCounts[colorKey] || 0) + 1;
+                  }
+                }
+                
+                // Get top colors
+                const sortedColors = Object.entries(colorCounts)
+                  .sort(([,a], [,b]) => b - a)
+                  .slice(0, 5)
+                  .map(([color]) => {
+                    const [r, g, b] = color.split(',').map(Number);
+                    return { r, g, b };
+                  });
+                
+                // Calculate contrast ratios between dominant colors
+                const contrastRatios = [];
+                for (let i = 0; i < sortedColors.length; i++) {
+                  for (let j = i + 1; j < sortedColors.length; j++) {
+                    const ratio = calculateContrastRatio(sortedColors[i], sortedColors[j]);
+                    contrastRatios.push(ratio);
+                  }
+                }
+                
+                const minContrast = Math.min(...contrastRatios);
+                const maxContrast = Math.max(...contrastRatios);
+                const avgContrast = contrastRatios.reduce((a, b) => a + b, 0) / contrastRatios.length;
+                
+                resolve({
+                  dominantColors: sortedColors,
+                  minContrast,
+                  maxContrast,
+                  avgContrast,
+                  wcagAA: minContrast >= 4.5,
+                  wcagAAA: minContrast >= 7.0,
+                  wcagAALarge: minContrast >= 3.0
+                });
+              } catch (error) {
+                reject(error);
+              }
+            };
+            
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = imageUrl;
+          });
+        };
+        
+        const enhanceComponentsWithContrastAnalysis = async (components) => {
+          const enhancedComponents = [];
+          const totalComponents = components.length;
+          
+          setAnalysisProgress({ current: 0, total: totalComponents, stage: 'Starting WCAG contrast analysis...' });
+          
+          for (let i = 0; i < components.length; i++) {
+            const component = components[i];
+            let contrastData = null;
+            
+            // Update progress
+            setAnalysisProgress({ 
+              current: i + 1, 
+              total: totalComponents, 
+              stage: 'Analyzing ' + component.name + ' (' + (i + 1) + '/' + totalComponents + ')'
+            });
+            
+            if (component.thumbnail_url && !component.thumbnail_url.includes('placeholder')) {
+              try {
+                contrastData = await analyzeImageColors(component.thumbnail_url);
+                
+                // Update health score based on actual contrast analysis
+                let contrastBonus = 0;
+                let contrastPenalty = 0;
+                
+                if (contrastData.wcagAAA) {
+                  contrastBonus += 15; // Excellent contrast (AAA)
+                } else if (contrastData.wcagAA) {
+                  contrastBonus += 10; // Good contrast (AA)
+                } else if (contrastData.wcagAALarge) {
+                  contrastBonus += 5; // Acceptable for large text
+                } else {
+                  contrastPenalty += 25; // Poor contrast
+                }
+                
+                // Apply contrast-based health score adjustment
+                const adjustedHealthScore = Math.max(0, Math.min(100, 
+                  component.healthScore + contrastBonus - contrastPenalty
+                ));
+                
+                enhancedComponents.push({
+                  ...component,
+                  healthScore: adjustedHealthScore,
+                  contrastAnalysis: contrastData
+                });
+              } catch (error) {
+                console.warn(\`Failed to analyze contrast for \${component.name}:\`, error);
+                enhancedComponents.push(component);
+              }
+            } else {
+              enhancedComponents.push(component);
+            }
+          }
+          
+          setAnalysisProgress({ current: totalComponents, total: totalComponents, stage: 'Analysis complete!' });
+          
+          return enhancedComponents;
+        };
         
         // Clear sensitive data on session end
         React.useEffect(() => {
@@ -454,6 +836,7 @@ const HTML_TEMPLATE = `<!doctype html>
           console.log('Validation passed! Starting analysis...');
           setIsLoading(true);
           setError('');
+          setAnalysisProgress({ current: 0, total: 0, stage: '' });
           
           try {
             const response = await fetch('https://figma-component-health.coscient.workers.dev/api/analyze', {
@@ -475,8 +858,13 @@ const HTML_TEMPLATE = `<!doctype html>
                 setError('No components found in this file. This could mean: (1) The file contains no published components or component sets, (2) The file is not a design system or component library, (3) Components exist but are not published to a team library. Try analyzing a file that contains published components or component sets.');
                 setComponentData([]);
               } else {
-                setComponentData(data.results[0].components);
-                console.log('Component data set successfully');
+                console.log('Starting thumbnail-based color contrast analysis...');
+                
+                // Enhance components with actual color contrast analysis
+                const enhancedComponents = await enhanceComponentsWithContrastAnalysis(data.results[0].components);
+                
+                setComponentData(enhancedComponents);
+                console.log('Component data set successfully with contrast analysis');
               }
             } else {
               console.log('No components found in response structure');
@@ -611,8 +999,8 @@ const HTML_TEMPLATE = `<!doctype html>
                 )
               ),
               
-              // Enterprise Mode Toggle
-              React.createElement('div', { className: 'mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg' },
+              // Enterprise Mode Toggle - HIDDEN for this version (dummy data only)
+              false && React.createElement('div', { className: 'mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg' },
                 React.createElement('div', { className: 'flex items-center justify-between' },
                   React.createElement('div', { className: 'flex items-center gap-3' },
                     React.createElement('div', { className: 'flex items-center gap-2' },
@@ -725,21 +1113,56 @@ const HTML_TEMPLATE = `<!doctype html>
               error && React.createElement('div', { className: 'mb-4 p-3 bg-red-50 border border-red-200 rounded-md' },
                 React.createElement('p', { className: 'text-sm text-red-700' }, error)
               ),
-              React.createElement('button', {
-                onClick: handleAnalyze,
-                disabled: isLoading,
-                className: 'px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm transition-colors duration-200 flex items-center gap-2'
-              }, 
-                isLoading ? [
-                  React.createElement('div', { key: 'spinner', className: 'w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' }),
-                  'Analyzing Component Inventory...'
-                ] : [
-                  React.createElement('svg', { key: 'icon', className: 'h-4 w-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' },
-                    React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' })
+              React.createElement('div', { className: 'space-y-3' },
+                React.createElement('button', {
+                  onClick: handleAnalyze,
+                  disabled: isLoading,
+                  className: 'px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm transition-colors duration-200 flex items-center gap-2'
+                }, 
+                  isLoading ? [
+                    React.createElement('div', { key: 'spinner', className: 'w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' }),
+                    analysisProgress.total > 0 ? analysisProgress.stage : 'Analyzing Component Inventory...'
+                  ] : [
+                    React.createElement('svg', { key: 'icon', className: 'h-4 w-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' },
+                      React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' })
+                    ),
+                    'Analyze Component Inventory'
+                  ]
+                ),
+                React.createElement('div', { className: 'flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md text-left' },
+                  React.createElement('svg', { 
+                    className: 'h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0', 
+                    fill: 'none', 
+                    stroke: 'currentColor', 
+                    viewBox: '0 0 24 24' 
+                  },
+                    React.createElement('path', { 
+                      strokeLinecap: 'round', 
+                      strokeLinejoin: 'round', 
+                      strokeWidth: 2, 
+                      d: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z' 
+                    })
                   ),
-                  'Analyze Component Inventory'
-                ]
-              )
+                  React.createElement('div', { className: 'text-sm text-amber-800' },
+                    React.createElement('p', { className: 'font-medium mb-1' }, 'Processing Time Notice'),
+                    React.createElement('p', null, 'Analysis includes real-time WCAG 2.2 color contrast checking using component thumbnails. Small libraries (< 20 components): ~30 seconds. Medium libraries (20-50 components): 1-2 minutes. Large libraries (50+ components): 2-5 minutes. Please be patient during analysis.')
+                  )
+                ),
+                // Progress bar for thumbnail analysis
+                isLoading && analysisProgress.total > 0 && React.createElement('div', { className: 'mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md' },
+                  React.createElement('div', { className: 'flex justify-between items-center mb-2' },
+                    React.createElement('span', { className: 'text-sm font-medium text-gray-900' }, 'WCAG Contrast Analysis Progress'),
+                    React.createElement('span', { className: 'text-sm text-gray-700' }, analysisProgress.current + '/' + analysisProgress.total)
+                  ),
+                  React.createElement('div', { className: 'w-full bg-gray-200 rounded-full h-2 mb-2' },
+                    React.createElement('div', { 
+                      className: 'bg-gray-600 h-2 rounded-full transition-all duration-300',
+                      style: { width: ((analysisProgress.current / analysisProgress.total) * 100) + '%' }
+                    })
+                  ),
+                  React.createElement('p', { className: 'text-xs text-gray-700' }, analysisProgress.stage)
+                )
+              ),
             ),
             
 
@@ -1231,7 +1654,7 @@ const HTML_TEMPLATE = `<!doctype html>
                     ),
                     React.createElement('div', { className: 'text-sm text-gray-700' },
                       React.createElement('p', { className: 'font-medium mb-1' }, 'Health Score Calculation'),
-                      React.createElement('p', null, 'Health scores are based on component documentation quality, naming conventions, and maintenance status. Components start at 100% and lose points for missing descriptions (-15%), deprecated status (-50%), or poor documentation. Well-documented library components receive bonus points (+10%).'),
+                      React.createElement('p', null, 'Components start at 100 points. Critical issues (-50): deprecated status, broken layout, accessibility violations. Major issues (-25): poor documentation, missing variants, WCAG contrast failures. Minor issues (-10): naming violations, missing thumbnails. Bonus points (+15): WCAG AAA contrast, (+10): WCAG AA contrast, excellent documentation, design system patterns.'),
                       React.createElement('p', { className: 'mt-2 text-gray-600' },
                         React.createElement('strong', null, 'Enterprise Version:'), ' Includes cross-file usage analytics, team adoption metrics, and historical trends for more accurate health assessment.'
                       )
