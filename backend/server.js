@@ -141,14 +141,20 @@ function calculateHealthScore(component, instanceCount, isDeprecated, isLibraryF
     score -= 30; // Only penalize unused components in non-library files
   }
   
-  // Penalize components without descriptions (documentation is important for libraries)
-  if (!component.description || component.description.trim() === '') score -= 15;
+  // Documentation scoring - match deployed version criteria
+  const description = component.description || '';
+  const descLength = description.trim().length;
   
-  // For library files, give bonus for having good documentation instead of usage
-  if (isLibraryFile && component.description && component.description.length > 20) {
-    score += 10; // Bonus for well-documented library components
-  } else if (!isLibraryFile && instanceCount > 5) {
-    score += 10; // Bonus for well-used components in regular files
+  if (descLength === 0) {
+    score -= 25; // Penalty for no documentation
+  } else if (descLength >= 10) {
+    // Basic documentation exists (avoids penalty)
+    if (descLength >= 50 && (description.includes('example') || description.includes('usage') || description.includes('use'))) {
+      score += 10; // Rich documentation with examples/usage
+    }
+    if (isLibraryFile && descLength >= 30) {
+      score += 10; // Extra credit for library components with good docs
+    }
   }
   
   return Math.max(0, Math.min(100, score));
