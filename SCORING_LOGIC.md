@@ -4,54 +4,134 @@
 
 The Figma Component Health Reporter uses a comprehensive scoring system that evaluates components across multiple dimensions to provide a health score from 0-100. The scoring combines base health metrics with advanced WCAG contrast analysis for a complete accessibility and quality assessment.
 
+**This documentation reflects the unified scoring system deployed across all environments (local, figma-component-health-ent, and figma-component-health) as of the latest standardization update.**
+
 ## Base Health Score Calculation
 
 ### Starting Score
 - **Base Score**: 100 points
 - All components start with a perfect score and points are deducted or added based on various criteria.
 
-### Core Penalties and Bonuses
+### Comprehensive Scoring System
 
-#### 1. Deprecation Status
+The unified worker uses a sophisticated multi-tier penalty and bonus system:
+
+## Critical Issues (-50 points each)
+
+### 1. Deprecated Status
 - **Deprecated Components**: -50 points
-- Components marked as deprecated receive a significant penalty as they should be phased out.
+- Components marked as deprecated receive the highest penalty as they should be phased out immediately.
 
-#### 2. Usage-Based Scoring (Non-Library Files Only)
-- **Unused Components**: -30 points (only for non-library files)
-- Library components are exempt from usage penalties since they're meant to be used across other files/teams.
+### 2. Broken Layout/Constraints
+- **Invalid Dimensions**: -50 points
+- Components with `absoluteBoundingBox` width or height ≤ 0 indicate broken auto-layout or constraints.
 
-#### 3. Documentation Scoring
+### 3. Accessibility Violations
+- **Critical Accessibility Issues**: -50 points
+- Interactive components (buttons, inputs, links) without accessibility information and relying on color-only indicators.
 
-##### Documentation Penalties
-- **No Documentation**: -25 points
-- Components without descriptions or with empty descriptions receive a penalty.
+## Major Issues (-25 points each)
 
-##### Documentation Bonuses
+### 4. Poor Documentation
+- **Missing or Insufficient Documentation**: -25 points
+- Components without descriptions or with descriptions < 10 characters.
+
+### 5. Missing Key Variants
+- **Incomplete Variant Coverage**: -25 points
+- Components lacking common interaction states (hover, disabled, active, focus, default) or proper variant patterns (= or / naming).
+
+## Minor Issues (-10 points each)
+
+### 6. Naming Convention Violations
+- **Poor Naming Standards**: -10 points
+- Components not following proper naming conventions: `^[A-Z][a-zA-Z0-9]*(\s*[\/=]\s*[A-Z][a-zA-Z0-9]*)*$`
+
+### 7. Missing Thumbnails
+- **No Visual Preview**: -10 points
+- Components without `thumbnail_url` or with placeholder thumbnails.
+
+### 8. Inconsistent Property Patterns
+- **Mixed Naming Styles**: -10 points
+- Components using both `=` and `/` patterns inconsistently within the same component name.
+
+## Bonus Points (+10 points each)
+
+### 9. Excellent Documentation with Examples
 - **Rich Documentation**: +10 points
-  - Criteria: 50+ characters AND contains keywords like "example", "usage", or "use"
-  - Rewards comprehensive documentation with usage examples
+- Components with descriptions > 50 characters containing "example" or "usage" keywords.
 
-- **Library Component Documentation**: +10 points
-  - Criteria: Library components with 30+ character descriptions
-  - Extra credit for well-documented library components
+### 10. Design System Pattern Recognition
+- **Consistent Design Patterns**: +10 points
+- Components following standard design system naming (Button, Input, Card, Icon, Badge, Alert) with proper variants.
 
-##### Documentation Evaluation Logic
+### 11. Well-Documented Library Components
+- **Library Component Excellence**: +10 points
+- Library components with descriptions > 30 characters indicating good adoption potential.
+
+### 12. Component Completeness
+- **Structural Excellence**: +10 points
+- Components with descriptions > 20 characters AND proper `absoluteBoundingBox` dimensions (width > 0, height > 0).
+
+### 13. Accessibility Excellence
+- **Superior Accessibility**: +10 points
+- Components with excellent accessibility implementation including ARIA, screen reader, or WCAG references.
+
+## Scoring Implementation
+
+### Accessibility Compliance Check
 ```javascript
-const description = component.description || '';
-const descLength = description.trim().length;
+function checkAccessibilityCompliance(component) {
+  const name = component.name.toLowerCase();
+  const description = (component.description || '').toLowerCase();
+  
+  const hasColorOnlyInfo = name.includes('red') || name.includes('green') || name.includes('color');
+  const lacksAriaInfo = !description.includes('aria') && !description.includes('accessible') && !description.includes('screen reader');
+  const hasInteraction = name.includes('button') || name.includes('input') || name.includes('link');
+  
+  return hasInteraction && lacksAriaInfo && hasColorOnlyInfo;
+}
+```
 
-if (descLength === 0) {
-  score -= 25; // Penalty for no documentation
-} else if (descLength >= 10) {
-  // Basic documentation exists (avoids penalty)
-  if (descLength >= 50 && (description.includes('example') || 
-                          description.includes('usage') || 
-                          description.includes('use'))) {
-    score += 10; // Rich documentation with examples/usage
-  }
-  if (isLibraryFile && descLength >= 30) {
-    score += 10; // Extra credit for library components with good docs
-  }
+### Accessibility Excellence Check
+```javascript
+function checkAccessibilityExcellence(component) {
+  const description = (component.description || '').toLowerCase();
+  return description.includes('aria') || description.includes('accessible') || 
+         description.includes('screen reader') || description.includes('wcag');
+}
+```
+
+### Complete Scoring Function
+```javascript
+function calculateHealthScore(component, instanceCount, isDeprecated, isLibraryFile = true) {
+  let score = 100; // Base Score: 100 points
+  
+  // CRITICAL ISSUES (-50 points each)
+  if (isDeprecated) score -= 50;
+  if (component.absoluteBoundingBox && (component.absoluteBoundingBox.width <= 0 || component.absoluteBoundingBox.height <= 0)) score -= 50;
+  if (checkAccessibilityCompliance(component)) score -= 50;
+  
+  // MAJOR ISSUES (-25 points each)
+  if (!component.description || component.description.trim().length < 10) score -= 25;
+  
+  const hasVariants = component.name.includes('=') || component.name.includes('/');
+  const commonVariants = ['hover', 'disabled', 'active', 'focus', 'default'];
+  const hasCommonVariants = commonVariants.some(variant => component.name.toLowerCase().includes(variant));
+  if (!hasVariants && !hasCommonVariants) score -= 25;
+  
+  // MINOR ISSUES (-10 points each)
+  if (!/^[A-Z][a-zA-Z0-9]*(\s*[\/=]\s*[A-Z][a-zA-Z0-9]*)*$/.test(component.name)) score -= 10;
+  if (!component.thumbnail_url || component.thumbnail_url.includes('placeholder')) score -= 10;
+  if (component.name.includes('=') && component.name.includes('/')) score -= 10;
+  
+  // BONUS POINTS (+10 points each)
+  if (component.description && component.description.length > 50 && (component.description.includes('example') || component.description.includes('usage'))) score += 10;
+  if (component.name.match(/^(Button|Input|Card|Icon|Badge|Alert)/) && hasVariants) score += 10;
+  if (isLibraryFile && component.description && component.description.length > 30) score += 10;
+  if (component.description && component.description.length > 20 && component.absoluteBoundingBox && component.absoluteBoundingBox.width > 0 && component.absoluteBoundingBox.height > 0) score += 10;
+  if (!checkAccessibilityCompliance(component) && checkAccessibilityExcellence(component)) score += 10;
+  
+  return Math.max(0, Math.min(100, score));
 }
 ```
 
