@@ -770,8 +770,13 @@ const HTML_TEMPLATE = `<!doctype html>
             });
             
             if (component.thumbnail_url && !component.thumbnail_url.includes('placeholder')) {
+              console.log('[CONTRAST DEBUG] Starting analysis for ' + component.name);
+              console.log('[CONTRAST DEBUG] Thumbnail URL: ' + component.thumbnail_url);
+              console.log('[CONTRAST DEBUG] Original health score: ' + component.healthScore);
+              
               try {
                 contrastData = await analyzeImageColors(component.thumbnail_url);
+                console.log('[CONTRAST DEBUG] Contrast analysis result:', contrastData);
                 
                 // Update health score based on actual contrast analysis
                 let contrastBonus = 0;
@@ -779,12 +784,16 @@ const HTML_TEMPLATE = `<!doctype html>
                 
                 if (contrastData.wcagAAA) {
                   contrastBonus += 15; // Excellent contrast (AAA)
+                  console.log('[CONTRAST DEBUG] Applied AAA bonus: +15 points');
                 } else if (contrastData.wcagAA) {
                   contrastBonus += 10; // Good contrast (AA)
+                  console.log('[CONTRAST DEBUG] Applied AA bonus: +10 points');
                 } else if (contrastData.wcagAALarge) {
                   contrastBonus += 5; // Acceptable for large text
+                  console.log('[CONTRAST DEBUG] Applied AA Large bonus: +5 points');
                 } else {
                   contrastPenalty += 25; // Poor contrast
+                  console.log('[CONTRAST DEBUG] Applied poor contrast penalty: -25 points');
                 }
                 
                 // Apply contrast-based health score adjustment
@@ -792,13 +801,16 @@ const HTML_TEMPLATE = `<!doctype html>
                   component.healthScore + contrastBonus - contrastPenalty
                 ));
                 
+                console.log('[CONTRAST DEBUG] Score adjustment: ' + component.healthScore + ' -> ' + adjustedHealthScore + ' (bonus: ' + contrastBonus + ', penalty: ' + contrastPenalty + ')');
+                
                 enhancedComponents.push({
                   ...component,
                   healthScore: adjustedHealthScore,
                   contrastAnalysis: contrastData
                 });
               } catch (error) {
-                console.warn(\`Failed to analyze contrast for \${component.name}:\`, error);
+                console.error('[CONTRAST DEBUG] Error analyzing ' + component.name + ':', error);
+                console.warn('Failed to analyze contrast for ' + component.name + ':', error);
                 enhancedComponents.push(component);
               }
             } else {
@@ -847,6 +859,11 @@ const HTML_TEMPLATE = `<!doctype html>
           const groups = {};
           
           components.forEach(component => {
+            // Skip components without a name
+            if (!component || !component.name) {
+              return;
+            }
+            
             let baseName;
             let isVariant = false;
             
@@ -1000,13 +1017,8 @@ const HTML_TEMPLATE = `<!doctype html>
                 // Enhance components with actual color contrast analysis
                 const enhancedComponents = await enhanceComponentsWithContrastAnalysis(data.results[0].components);
                 
-                // Set component data with enterprise analytics
-                const resultsWithAnalytics = data.results.map(result => ({
-                  ...result,
-                  components: enhancedComponents
-                }));
-                
-                setComponentData(resultsWithAnalytics);
+                // Set component data as flat array of components (not nested results structure)
+                setComponentData(enhancedComponents);
                 console.log('Component data set successfully with contrast analysis');
               }
             } else {
@@ -1149,8 +1161,8 @@ const HTML_TEMPLATE = `<!doctype html>
                 )
               ),
               
-              // Enterprise Mode Toggle - NOW ENABLED for testing
-              true && React.createElement('div', { className: 'mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg' },
+              // Enterprise Mode Toggle - HIDDEN for standard deployment
+              false && React.createElement('div', { className: 'mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg' },
                 React.createElement('div', { className: 'flex items-center justify-between' },
                   React.createElement('div', { className: 'flex items-center gap-3' },
                     React.createElement('div', { className: 'flex items-center gap-2' },

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, BarChart3, Download, Search, AlertCircle, ChevronDown, ChevronRight, Info, TriangleAlert, Grid3X3, CheckCircle, Clock, Files, FileCheck, TrendingUp, Layers, FileCheckIcon, AlertTriangle, ArrowUpRight, Figma, Box } from 'lucide-react'
+import { FileText, Download, Search, AlertCircle, ChevronDown, ChevronRight, Info, TriangleAlert, Layers, FileCheckIcon, AlertTriangle, ArrowUpRight, Box } from 'lucide-react'
 import './App.css'
 
 interface ComponentData {
@@ -285,20 +285,29 @@ function App() {
       });
 
       if (component.thumbnail_url && !component.thumbnail_url.includes('placeholder')) {
+        console.log(`[LOCAL CONTRAST DEBUG] Starting analysis for ${component.name}`);
+        console.log(`[LOCAL CONTRAST DEBUG] Thumbnail URL: ${component.thumbnail_url}`);
+        console.log(`[LOCAL CONTRAST DEBUG] Original health score: ${component.healthScore}`);
+        
         try {
           contrastData = await analyzeImageColors(component.thumbnail_url);
+          console.log(`[LOCAL CONTRAST DEBUG] Contrast analysis result:`, contrastData);
 
           // Update health score based on actual contrast analysis - match deployed version
           let contrastAdjustment = 0;
 
           if (contrastData.wcagAAA && contrastData.minContrast >= 7.0) {
             contrastAdjustment += 15; // Real WCAG AAA compliance (+15 points) for 7:1+ contrast
+            console.log(`[LOCAL CONTRAST DEBUG] Applied AAA bonus: +15 points`);
           } else if (contrastData.wcagAA && contrastData.minContrast >= 4.5) {
             contrastAdjustment += 10; // Real WCAG AA compliance (+10 points) for 4.5:1+ contrast
+            console.log(`[LOCAL CONTRAST DEBUG] Applied AA bonus: +10 points`);
           } else if (contrastData.wcagAALarge && contrastData.minContrast >= 3.0) {
             contrastAdjustment += 5; // Large text compliance (+5 points) for 3:1+ contrast
+            console.log(`[LOCAL CONTRAST DEBUG] Applied AA Large bonus: +5 points`);
           } else if (contrastData.minContrast < 3.0) {
             contrastAdjustment -= 25; // Contrast failures (-25 points) for below WCAG standards
+            console.log(`[LOCAL CONTRAST DEBUG] Applied poor contrast penalty: -25 points`);
           }
 
           // Apply contrast-based health score adjustment
@@ -306,12 +315,15 @@ function App() {
             (component.healthScore || 0) + contrastAdjustment
           ));
 
+          console.log(`[LOCAL CONTRAST DEBUG] Score adjustment: ${component.healthScore} -> ${adjustedHealthScore} (adjustment: ${contrastAdjustment})`);
+
           enhancedComponents.push({
             ...component,
             healthScore: adjustedHealthScore,
             contrastData
           });
         } catch (error) {
+          console.error(`[LOCAL CONTRAST DEBUG] Error analyzing ${component.name}:`, error);
           console.warn(`Failed to analyze contrast for ${component.name}:`, error);
           enhancedComponents.push(component);
         }

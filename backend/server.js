@@ -128,33 +128,116 @@ function analyzeComponentHealth(components, allNodes) {
   });
 }
 
-// Helper function to calculate component health score
+// Helper function to check accessibility compliance (basic implementation)
+function checkAccessibilityCompliance(component) {
+  // Basic accessibility checks - can be enhanced with more sophisticated analysis
+  const name = component.name.toLowerCase();
+  const description = (component.description || '').toLowerCase();
+  
+  // Check for potential accessibility issues
+  const hasColorOnlyInfo = name.includes('red') || name.includes('green') || name.includes('color');
+  const lacksAriaInfo = !description.includes('aria') && !description.includes('accessible') && !description.includes('screen reader');
+  const hasInteraction = name.includes('button') || name.includes('input') || name.includes('link');
+  
+  // If it's an interactive component without accessibility info, flag as issue
+  return hasInteraction && lacksAriaInfo && hasColorOnlyInfo;
+}
+
+// Helper function to check accessibility excellence
+function checkAccessibilityExcellence(component) {
+  const description = (component.description || '').toLowerCase();
+  return description.includes('aria') || description.includes('accessible') || 
+         description.includes('screen reader') || description.includes('wcag');
+}
+
+// Helper function to calculate component health score (UNIFIED WORKER VERSION)
 function calculateHealthScore(component, instanceCount, isDeprecated, isLibraryFile = true) {
-  let score = 100;
+  let score = 100; // Base Score: 100 points
   
-  // Penalize deprecated components
-  if (isDeprecated) score -= 50;
-  
-  // For library files, don't penalize for low usage within the same file
-  // since components are meant to be used across other files/teams
-  if (!isLibraryFile && instanceCount === 0) {
-    score -= 30; // Only penalize unused components in non-library files
+  // CRITICAL ISSUES (-50 points each)
+  if (isDeprecated) {
+    score -= 50; // Deprecated status
   }
   
-  // Documentation scoring - match deployed version criteria
-  const description = component.description || '';
-  const descLength = description.trim().length;
+  // Check for broken auto-layout/constraints (inferred from component structure)
+  if (component.absoluteBoundingBox && (
+    component.absoluteBoundingBox.width <= 0 || 
+    component.absoluteBoundingBox.height <= 0
+  )) {
+    score -= 50; // Broken layout dimensions
+  }
   
-  if (descLength === 0) {
-    score -= 25; // Penalty for no documentation
-  } else if (descLength >= 10) {
-    // Basic documentation exists (avoids penalty)
-    if (descLength >= 50 && (description.includes('example') || description.includes('usage') || description.includes('use'))) {
-      score += 10; // Rich documentation with examples/usage
-    }
-    if (isLibraryFile && descLength >= 30) {
-      score += 10; // Extra credit for library components with good docs
-    }
+  // Accessibility violations (inferred from component characteristics)
+  const hasAccessibilityIssues = checkAccessibilityCompliance(component);
+  if (hasAccessibilityIssues) {
+    score -= 50; // Critical accessibility violations
+  }
+  
+  // MAJOR ISSUES (-25 points each)
+  
+  // Poor documentation
+  if (!component.description || component.description.trim().length < 10) {
+    score -= 25; // Missing or very poor documentation
+  }
+  
+  // Check for missing key variants (inferred from naming patterns)
+  const hasVariants = component.name.includes('=') || component.name.includes('/');
+  const commonVariants = ['hover', 'disabled', 'active', 'focus', 'default'];
+  const hasCommonVariants = commonVariants.some(variant => 
+    component.name.toLowerCase().includes(variant)
+  );
+  
+  if (!hasVariants && !hasCommonVariants) {
+    score -= 25; // Likely missing key interaction variants
+  }
+  
+  // MINOR ISSUES (-10 points each)
+  
+  // Naming convention violations
+  const hasGoodNaming = /^[A-Z][a-zA-Z0-9]*(\s*[\/=]\s*[A-Z][a-zA-Z0-9]*)*$/.test(component.name);
+  if (!hasGoodNaming) {
+    score -= 10; // Poor naming conventions
+  }
+  
+  // Missing thumbnails (no thumbnail_url or broken)
+  if (!component.thumbnail_url || component.thumbnail_url.includes('placeholder')) {
+    score -= 10; // Missing or broken thumbnail
+  }
+  
+  // Inconsistent property patterns (check for mixed naming styles)
+  if (component.name.includes('=') && component.name.includes('/')) {
+    score -= 10; // Mixed property patterns (both = and / in same component)
+  }
+  
+  // BONUS POINTS (+10 points each)
+  
+  // Excellent documentation with examples
+  if (component.description && component.description.length > 50 && 
+      (component.description.includes('example') || component.description.includes('usage'))) {
+    score += 10; // Rich documentation with examples
+  }
+  
+  // Design token integration (inferred from consistent naming)
+  if (component.name.match(/^(Button|Input|Card|Icon|Badge|Alert)/) && hasVariants) {
+    score += 10; // Follows design system patterns
+  }
+  
+  // High adoption indicator (for library files, good documentation suggests usage)
+  if (isLibraryFile && component.description && component.description.length > 30) {
+    score += 10; // Well-documented library components likely have good adoption
+  }
+  
+  // Component completeness bonus (has both description and proper structure)
+  if (component.description && component.description.length > 20 && 
+      component.absoluteBoundingBox && 
+      component.absoluteBoundingBox.width > 0 && 
+      component.absoluteBoundingBox.height > 0) {
+    score += 10; // Complete, well-structured component
+  }
+  
+  // Full accessibility compliance bonus
+  if (!hasAccessibilityIssues && checkAccessibilityExcellence(component)) {
+    score += 10; // Excellent accessibility implementation
   }
   
   return Math.max(0, Math.min(100, score));
