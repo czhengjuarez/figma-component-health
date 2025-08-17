@@ -4,6 +4,35 @@ A comprehensive tool for analyzing Figma component libraries with enterprise-gra
 
 **Last Updated**: August 16, 2025
 
+## 🔄 Converting to Standard Version
+
+To convert this enterprise version back to a standard component analysis tool (without enterprise analytics):
+
+### Quick Conversion Steps:
+1. **Hide Enterprise Toggle**: In `src/App.tsx`, find the enterprise mode toggle button and set `style={{ display: 'none' }}` or remove it entirely
+2. **Expand Component List**: In `src/App.tsx`, change `const [isInventoryCollapsed, setIsInventoryCollapsed] = useState(false)` to `useState(false)` to show the component inventory expanded by default
+
+### Detailed Instructions:
+```typescript
+// In src/App.tsx
+
+// Step 1: Hide the enterprise toggle (around line 720-740)
+// Find this section and hide or remove it:
+<button
+  onClick={() => setIsEnterpriseMode(!isEnterpriseMode)}
+  className="..."
+  style={{ display: 'none' }} // Add this line to hide
+>
+  Enterprise Analytics
+</button>
+
+// Step 2: Show component inventory by default (around line 47)
+// Change this line:
+const [isInventoryCollapsed, setIsInventoryCollapsed] = useState(false); // Change true to false
+```
+
+The standard version will then function as a regular component health analyzer without enterprise features, using only the standard Figma API for component analysis.
+
 ## 🚀 Features
 
 ### Core Analytics
