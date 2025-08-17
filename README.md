@@ -84,9 +84,58 @@ cd figma-components
 npm install
 cd backend
 npm install
-      },
-      // other options...
-    },
-  },
-])
+```
+
+### 2. Local Development Workflow
+
+⚠️ **IMPORTANT**: Due to networking limitations in the local `wrangler dev` environment, the recommended development workflow is:
+
+#### Frontend Development (Recommended)
+```bash
+# Start frontend dev server (uses deployed backend)
+npm run dev
+# Frontend: http://localhost:3002
+# Backend: Uses production deployment automatically
+```
+
+#### Backend Development (Use Separate Worker)
+⚠️ **CRITICAL WARNING**: Never deploy directly to the production worker during development as it will disrupt the live version.
+
+**For Backend Changes:**
+1. **Create a separate test worker** in Cloudflare Workers dashboard
+2. **Update `wrangler.toml`** to use your test worker name:
+   ```toml
+   name = "figma-component-health-test-[your-name]"  # Change this!
+   ```
+3. **Deploy to your test worker**:
+   ```bash
+   cd backend
+   wrangler deploy
+   ```
+4. **Update frontend** to use your test worker URL temporarily:
+   ```typescript
+   // In src/App.tsx, change the URLs to your test worker:
+   const response = await fetch('https://your-test-worker.workers.dev/api/analyze', {
+   ```
+5. **Test thoroughly** before deploying to production
+6. **Deploy to production** only when changes are verified
+
+#### Why This Workflow?
+- Local `wrangler dev` has SSL/networking issues with Figma API
+- Production Cloudflare Workers environment works perfectly
+- Prevents accidental disruption of live production version
+- Allows safe testing of backend changes
+
+### 3. Production Deployment
+
+**Frontend + Backend (Unified)**:
+```bash
+cd backend
+npm run build-and-deploy
+```
+
+**Backend Only**:
+```bash
+cd backend
+wrangler deploy
 ```
